@@ -3,40 +3,45 @@
 //---------------------------------------------------------
 
 //---------------------------------------------------------
+// Known issues
+//   - When you click an alert URL in the spreadsheet, the result is always shown in SFDC Classic, not Lighting.
+//   - If you open the spreadsheet in LibreOffice Calc, the links sometimes misbehave: are truncated; or CTRL-click doesn't work
+//---------------------------------------------------------
+
+//---------------------------------------------------------
 // Author: Sir Rodney MacKenzie mr.jcrm@gmail.com
 // Created: February 2023
 // Purpose: Dumps all email alerts (and Flow email actions) to a spreadsheet and emails it to current user
 // Strategy: Uses REST/Tooling API to read the WorkflowAlert and Flow sObjects
-// Strategy: Uses batch Apex to handle orgs with large (> 100) numbers of email alerts
+// Strategy: Uses batch Apex in order to handle orgs with large (> 100) numbers of email alerts
 // Updates made to Salesforce data: None
 //
 // How to run
-//  - Create a flow with a screen element whose button runs the Apex Action "Export Email Alerts"
-//  - NOTE: This Apex class cannot be run via execute anonymous
+//  - Deploy these classes, then create a flow with a screen element whose button runs Apex Action "Export Email Alerts"
+//  - Or, execute anonymous: Database.executeBatch(new BATCH_ExportEmailAlerts(),100); // Last parameter is batch size (min=1, max=100)
 //
 // Notes
-//   - Implemented as batch Apex, not queueable Apex, because with queueable the app would only handle orgs having 100 or fewer email alerts, due to governor limit on HTTP callouts.
+//   - Implemented as batch Apex (not queueable Apex, because queueable has a governor limit of 100 HTTP callouts)
 //
 // Miscellaneous
 //  - To monitor heap size: if (Limits.getHeapSize > 8000000){}
 //  - URL = protocol + host or domain + path + querystring
+//  - How to initialise a string list: for (string x : new list<string> {'a','b','c'})
 //---------------------------------------------------------
 
 //---------------------------------------------------------
 public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Database.Stateful, Database.AllowsCallouts  { // was global
 //---------------------------------------------------------
+static final string version = '1.1';
 
 //---------------------------------------------------------
 @InvocableMethod(label='Export Email Alerts') public static void exportEmailAlerts() {
-// This method makes the class available as an Apex Action in flow builder
 //---------------------------------------------------------
-Database.executeBatch(new BATCH_ExportEmailAlerts(),100); // Specify batch size (min=1, max=100)
+// This method makes the class available as an Apex Action in flow builder
+Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // When run from a flow, use batchsize of 1 to be on the safe side
 }
 
-//---------------------------------------------------------
-
 // Governor statistics
-public integer batches=0;
 public integer max_cpu = 0;
 public integer max_dmlrows = 0;
 public integer max_dmlstmt = 0;
@@ -46,76 +51,85 @@ public integer max_queryrows = 0;
 public integer max_emails = 0;
 public integer max_batchsize = 0;
     
-// Vars for all batch jobs
+// Vars for any batch job
 public string exceptions=''; // Summary of all exceptions caught when this job ran.
-public integer dbErrors=0;
-public integer warnings=0;
 public datetime startTime = system.now();
+static final string SFDC_URL = Url.getSalesforceBaseUrl().toExternalForm(); // E.g., Url.getOrgDomainUrl().toExternalForm() (Canonical URL) or Url.getSalesforceBaseUrl().toExternalForm() (Host-independent URL)
     
 // Vars for this app
-public string alertCSV;
+public string alertCSV = '';
 static final string thisAppName = 'ExportEmailAlerts'; 
 static final string APIVER = 'v56.0';
 static final string query_start_workflowalert = 'Select+id+from+workflowalert';
-static final string query_start_flow = 'Select+id+from+flow';
-public integer TotalWorkflowAlerts = 0;
+static final string query_start_flow = 'Select+id+from+flow+where+status=\'active\'+and+processtype=\'flow\'';
+public integer totalEmailAddresses = 0;
+public final string CSVHeading = 
+  '"Email",' +
+  '"Alert name",' + // Email alert name, or Flow name + "/" + Email action name
+  '"Alert type",' + // Flow email action, or Email alert
+  '"User name",' + // First Name + Last Name (applies only to SFDC users) ????
+  '"Recipient type",' + // Group, Role, Role-Sub, User, CcEmail
+  '"Recipient value",' + // GroupName, RoleName, UserFirstLast ????
+  '"User status",' + // SFDC user active or inactive
+  '"Alert URL",' + // SFDC_URL/01W... (WorkflowAlert), or SFDC_URL/301... (Flow)
+  '\n'; 
 
 //---------------------------------------------------------
-public class CSVRecord { // wrapper class for CSV
+public BATCH_ExportEmailAlerts() { // Constructor (was global)
 //---------------------------------------------------------
-  public string Email;
-  public string AlertName;
-  public string UserFirstLast; 
-  public string RecipientType; // Group, Role, Role-Sub, User, CcEmail
-  public string RecipientName; // GroupName, RoleName, UserFirstLast
-  public string UserStatus;
-  public string AlertType; // Flow email action, Email alert
-  public string AlertId; // 01W or 301
-} // end class
-
-//---------------------------------------------------------
-public BATCH_ExportEmailAlerts() { // was global
-//---------------------------------------------------------
-// Constructor
-//list<CSVRecord> CSVRecordList = new list<CSVRecord>();
+alertCSV = CSVHeading; 
 } // end method
-    
+
 //---------------------------------------------------------
 public Iterable<String> start(Database.BatchableContext BC) {
 //---------------------------------------------------------
-//for (string x : new list<string> {'a','b','c'}) {
-list<string> workflowAlertIds = new list<string>();
+list<string> alertIds = new list<string>();
+
+// Set up common HTTP parameters
 HttpRequest req = new HttpRequest();
+Http h = new Http();
+HttpResponse res;
 req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionID());
 req.setHeader('Content-Type', 'application/json');
-req.setEndpoint(URL.getSalesforceBaseUrl().toExternalForm() + '/services/data/'+ APIVER + '/tooling/query?q=' + query_start_workflowalert);
 req.setMethod('GET'); 
-Http h = new Http();
-HttpResponse res = h.send(req);
+
+// Get WorkflowAlert ids
+req.setEndpoint(SFDC_URL + '/services/data/'+ APIVER + '/tooling/query?q=' + query_start_workflowalert);
+getAlertIds (h, req, res, alertIds);
+// Get Flow ids
+req.setEndpoint(SFDC_URL + '/services/data/'+ APIVER + '/tooling/query?q=' + query_start_flow);
+getAlertIds (h, req, res, alertIds);
+
+alertIds.clear();
+for (integer x=0; x<500; x++) {
+  alertIds.add ('01W3c000000gDu2EAE'); // add WorkflowAlerts
+  alertIds.add ('3013c000000gQpfAAE'); // add Flows
+} // end for
+
+return alertIds; // Return list of alert Ids.
+} // end method 
+
+//---------------------------------------------------------
+private void getAlertIds (Http h, HttpRequest req, HttpResponse res, list<string> alertIds) {
+//---------------------------------------------------------
+res = h.send(req);
 if (res.getStatus() != 'ok') { 
-  exceptions = exceptions + '\nstart.HTTP GET error: Status=' + res.getStatus(); 
+  exceptions = exceptions + '\ngetAlertIds: HTTP GET error: ' + res.getStatus(); 
 }
 else {
   JSONParser parser = JSON.createParser(res.getBody());
   while (parser.nextToken() != null) {
     if ((parser.getCurrentToken() == JSONToken.FIELD_NAME) && (parser.getText() == 'Id')) {
       parser.nextToken(); // Get the Id.
-      workflowAlertIds.add(parser.getText()); // Add the Id to a list.
+      alertIds.add(parser.getText()); // Add the Id to a list.
     } // end if
   } // end while
-  TotalWorkflowAlerts = workflowAlertIds.size(); // total number of alerts, for reporting purposes
 } // end if
+} // end method
 
-return workflowAlertIds; // Return list of alert Ids.
-} // end method 
-        
 //---------------------------------------------------------
 public void execute(Database.BatchableContext BC, List<String> scope) { // was global
 //---------------------------------------------------------
-batches++;
-// ------------- Create spreadsheet rows for WorkflowAlert (rec prefix=01W)
-// if (scope[0].left(3) == '01W') { // 01W rec prefix = workflowalert
-
 HttpRequest req = new HttpRequest();
 Http h = new Http();
 HttpResponse res;
@@ -124,15 +138,23 @@ req.setHeader('Content-Type', 'application/json');
 req.setMethod('GET'); 
 
 for(Integer x = 0; x < scope.size(); x++) {
-  if (scope[0].left(3) == '01W') { // 01W rec prefix = workflowalert
-    req.setEndpoint(URL.getSalesforceBaseUrl().toExternalForm() + '/services/data/'+ APIVER + '/tooling/sobjects/WorkflowAlert/' + scope[x]);
+  if (scope[x].left(3) == '01W') { // 01W rec prefix = workflowalert
+    req.setEndpoint(SFDC_URL + '/services/data/'+ APIVER + '/tooling/sobjects/WorkflowAlert/' + scope[x]);
     res = h.send(req);
-    addToSpreadsheet_WorkflowAlert(res);
+    if (res.getStatus() != 'ok') {
+      system.debug('glixl1 rectype 01W status=' + res.getStatus() + ', id=' + scope[x]);
+    } else {
+      addToSpreadsheet_WorkflowAlert(res);
+    }
   } 
-  else if (scope[0].left(3) == '301') { // 301 rec prefix = flow)
-    req.setEndpoint(URL.getSalesforceBaseUrl().toExternalForm() + '/services/data/'+ APIVER + '/tooling/sobjects/WorkflowAlert/' + scope[x]);
+  else if (scope[x].left(3) == '301') { // 301 rec prefix = flow)
+    req.setEndpoint(SFDC_URL + '/services/data/'+ APIVER + '/tooling/sobjects/Flow/' + scope[x]);
     res = h.send(req);
-    addToSpreadsheet_Flow(res);
+    if (res.getStatus() != 'ok') {
+      system.debug('glixl2: rectype 301 status=' + res.getStatus() + ', id=' + scope[x]);
+    } else {
+      addToSpreadsheet_Flow(res);
+    }
   } // end if    
 } // end for
 
@@ -143,122 +165,197 @@ updateBatchGovernorStats(scope.size());
 //----------------------------------------------------------
 public void finish(Database.BatchableContext BC) { // was global
 //---------------------------------------------------------
-alertCSV = 
-'"Title 1",' + '"Title 2",' + '"Title 3",' + '"Title 4",' + '"Title 5",' + '"Title 6",' + '"Title 7",' + '"Title 8"' + '\n' + 
-'"aaa",' + '"bbb",' + '"ccc",' + '"ddd",' + '"eee",' + '"fff",' + '"ggg",' + '"hhh"' + '\n' + 
-'"aaa1",' + '"bbb2",' + '"ccc3",' + '"ddd4",' + '"eee5",' + '"fff6",' + '"ggg7",' + '"hhh8"';
-emailCSV(alertCSV);
 emailJobResult (BC);
 } // end method
 
 //---------------------------------------------------------
 public void addToSpreadsheet_WorkflowAlert(HttpResponse res) {
 //---------------------------------------------------------
-
 WorkflowAlert w = (WorkflowAlert)JSON.deserialize(res.getBody(), WorkflowAlert.class);
 
-// JSON fields 
-list<string> RecipientName_list = new list<string>(); // Group("groupName"), Role("roleName"), User("userFirstName userLastName")
-list<string> RecipientType_List = new list<string>(); // "Public groups", "Role", "Role and Subordinates", "User"
-string CcEmails; // list of emails delimited by commas
-string alertType; // "Email alert" or "Flow email action"
-string alertName; // aka workflowAlert.Description
-string userStatus; // SELECT status FROM user WHERE firstname = %firstname AND lastname = %lastname
+if (w.CcEmails != null) { 
+  list<string> ccEmailList = new list<string>(w.CcEmails.split(','));
+  for (integer x=0; x < ccEmailList.size(); x++) {
+    totalEmailAddresses++;
+    alertCSV = alertCSV + 
+      '"' + ccEmailList[x] + '",' +
+      '"' + w.Description + '",' +
+      '"' + w.attributes.type + '",' + 
+      '" ",' + 
+      '" ",' +
+      '"' + 'Cc email' + '",' + 
+      '" ",' +
+      '"' + SFDC_URL + '/' + w.id + '",' +      
+      '\n';
+  }
+}
 
-integer Type_Count=0; Integer CcEmails_Count=0;
-JSONParser parser = JSON.createParser(res.getBody());
-while (parser.nextToken() != null) {
-    if ((parser.getCurrentToken() == JSONToken.FIELD_NAME) && (parser.getText() == 'Description')) {
-        parser.nextToken();
-        alertName = parser.getText();
-    } // end if
-    if ((parser.getCurrentToken() == JSONToken.FIELD_NAME) && (parser.getText() == 'Recipient')) {
-        parser.nextToken();
-        recipientName_list.add(parser.getText());
-    } // end if
-    if ((parser.getCurrentToken() == JSONToken.FIELD_NAME) && (parser.getText() == 'Type')) { // There's two different Type keys.
-        Type_Count++;
-        parser.nextToken();
-        if (Type_Count == 1) { // First Type is alert.type
-            alertType = parser.getText();
+if (w.metadata.recipients.size() > 0) {
+  system.debug('ok 1, description=' + w.description + ', recips=' + w.metadata.recipients.size());
+  for (integer x=0; x < w.metadata.recipients.size(); x++) {
+    system.debug('ok 2' + ', recip.type=' + w.Metadata.recipients[x].type); 
+    switch on w.Metadata.recipients[x].type {
+      when 'group' {
+        system.debug('ok 1: group, desc=' + w.description);
+        list<user> userList = getUserList_Group(w.Metadata.recipients[x].recipient);
+        if (userList.size() > 0) {
+          system.debug('ok 1.1');
+          for (integer y=0; y < userList.size(); y++) {
+            system.debug('ok 1.2');
+            totalEmailAddresses++;
+            alertCSV = alertCSV + 
+              '"' + userList[y].email + '",' +
+              '"' + w.Description + '",' +
+              '"' + w.attributes.type + '",' + 
+              '"' + userList[y].firstName + ' ' + userList[y]. lastName + '",' +
+              '"' + w.Metadata.recipients[y].type + '",' +
+              '"' + w.Metadata.recipients[y].recipient + '",' +
+              '"' + (userList[y].isActive == true ? 'Active' : 'Inactive') + '",' +
+              '"' + SFDC_URL + '/' + w.id + '",' + 
+              '\n';
+          }
         }
-        else { // Second & subsequent Types are recipient.types
-            recipientType_list.add(parser.getText());
-          } // end if
-    } // end if
-    if ((parser.getCurrentToken() == JSONToken.FIELD_NAME) && (parser.getText() == 'CcEmails')) {
-        CcEmails_Count++;
-        if (CcEmails_Count == 1) { // There are duplicate CcEmail keys after first one, ignore them.
-            parser.nextToken();
-            CcEmails = parser.getText();
-        } // end if
-    } // end if
-} // end while
-system.debug('glixl add workflowalert to ss: ' +
-'RecipientName_list=' + RecipientName_list + 
-'RecipientType_List=' + RecipientType_List + 
-'CcEmails=' + CcEmails + 
-'alertType=' + alertType +  
-'alertName=' + alertName);
+      }
+      when 'role' {
+        system.debug('ok 2: role, desc=' + w.Description);
+      }
+      when 'roleSubordinates' {
+        system.debug('ok 3: role+sub, desc=' + w.Description);
+      }
+      when 'user' {
+        system.debug('ok 4: user, desc=' + w.Description);
+      }
+    } // end switch
 
+  }
+}
+
+/* To-do 
+Recip structure:
+  - list<string> RecipientName_list = new list<string>(); // Group("groupName"), Role("roleName"), User("xx@xx.com,yy@yy.com")
+  - list<string> RecipientType_List = new list<string>(); // "Public groups", "Role", "roleSubordinates", "User"
+SOQL for single SFDC user: 
+  - string userIsActive, userNameFirstLast: if recipType='user:' SELECT isactive,lastname,firstname FROM user WHERE email = recipients[x].name
+SOQL to Find SFDC users who belong to the following:
+  - Role:
+      SELECT Id FROM UserRole WHERE Name = JSON.RoleName
+      SELECT isactive,lastname,firstname,email FROM User WHERE UserRoleId = userRole.id
+  - Role+Sub:
+      SELECT xxx
+  - Group
+      SELECT Id FROM Group WHERE Name = JSON.GroupName 
+      SELECT UserOrGroupId FROM GroupMember WHERE GroupId = Group.Id
+      Loop: SELECT isactive,lastname,firstname,email FROM User WHERE Id = GroupMember.UserOrGroupId
+*/
 } // end method
+
+//---------------------------------------------------------
+private list<user> getUserList_Group (string groupName) {
+//---------------------------------------------------------
+list<user> userList = new list <user>();
+list<group> groupId = new list<group> ([SELECT Id FROM Group WHERE Name = :groupName LIMIT 1]);
+if (groupId.size() > 0) {
+  id groupid0 = groupId[0].id;
+  list<GroupMember> groupMembers = new list<groupmember> ([SELECT UserOrGroupId FROM groupmember WHERE GroupId = :groupid0]);
+  list<id> groupmemZ = new list<id>();
+  for (integer x=0; x < groupMembers.size(); x++) {
+    groupmemZ.add(groupMembers[x].UserOrGroupId);
+  }
+  userList = [SELECT Id, Email, FirstName, LastName, IsActive FROM User WHERE Id in :groupmemZ];
+}
+  return userList;
+} // end method
+
+  //SELECT Id FROM Group WHERE Name = JSON.GroupName 
+  //SELECT UserOrGroupId FROM GroupMember WHERE GroupId = Group.Id
+  //Loop: SELECT isactive,lastname,firstname,email FROM User WHERE Id = GroupMember.UserOrGroupId  
 
 //---------------------------------------------------------
 public void addToSpreadsheet_Flow(HttpResponse res) {
 //---------------------------------------------------------
 Flow f = (Flow)JSON.deserialize(res.getBody(), Flow.class);
+// To be in the spreadsheet, the flow must have an "emailSimple" action.
+for (integer a=0; a < f.metadata.actionCalls.size(); a++) {
+  if (f.metadata.actionCalls[a].actionType == 'emailSimple') {
+    for (integer b=0; b < f.metadata.actionCalls[a].inputParameters.size(); b++) {
+      if (f.metadata.actionCalls[a].inputParameters[b].name == 'emailAddresses') { 
+        list<string> emailList = new list<string>(f.metadata.actionCalls[a].inputParameters[b].value.stringValue.split(','));
+        for (integer x=0; x < emailList.size(); x++) {
+          totalEmailAddresses++;
+          alertCSV = alertCSV + 
+          '"' + emailList[x] + '",' +
+          '"' + f.MasterLabel + '/' + f.Metadata.actionCalls[a].label + '",' +
+          '"' + f.attributes.type + '",' + 
+          '" ",' +
+          '" ",' +
+          '" ",' +
+          '" ",' +
+          '"' + SFDC_URL + '/' + f.id + '",' +
+          '\n';
+        }
+      }
+    }
+  } // end if
+} // end for
+
 } // end method
       
 //---------------------------------------------------------
-private void EmailCSV(string emailAlerts) {
-//---------------------------------------------------------
-Messaging.EmailFileAttachment csvAttc = new Messaging.EmailFileAttachment();
-blob csvBlob = Blob.valueOf(emailAlerts);
-string csvname= 'Email alerts.csv'; csvAttc.setFileName(csvname);
-csvAttc.setBody(csvBlob);
-Messaging.SingleEmailMessage email =new Messaging.SingleEmailMessage();
-String[] toAddresses = new list<string> {'test@test.com'};
-String subject ='Here\'s your list of email alerts'; email.setSubject(subject);
-email.setSenderDisplayName('Salesforce');
-email.setToAddresses(UserInfo.getUserEmail().split(','));
-email.setPlainTextBody('List of email alerts');
-email.setFileAttachments(new Messaging.EmailFileAttachment[]{csvAttc});
-Messaging.SendEmailResult [] r = Messaging.sendEmail(new Messaging.SingleEmailMessage[] {email});
-}
-
-//---------------------------------------------------------
 public void emailJobResult(Database.BatchableContext BC) {
 //---------------------------------------------------------
-string elapsedTime = ((system.now().getTime() - startTime.getTime()) / 1000.0 / 60.0 / 60.0).format();
+//string elapsedTime = ((system.now().getTime() - startTime.getTime()) / 1000.0 / 60.0 / 60.0).format();
+string elapsedTime = convertMsToHHMMSS (system.now().getTime() - startTime.getTime());
+
+Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
 AsyncApexJob asyncApexJob = 
   [SELECT Id, Status, NumberOfErrors, JobItemsProcessed, TotalJobItems 
   FROM AsyncApexJob 
   WHERE Id = :BC.getJobId()];
 
-integer numberOfErrors = dbErrors + asyncApexJob.numberOfErrors;
+string subjectLine;
+if (asyncApexJob.numberOfErrors > 0) {
+  subjectLine = thisAppName + ' ' + asyncApexJob.Status + '. ' + asyncApexJob.numberOfErrors + ' batches had errors';
+}
+else if (totalEmailAddresses == 0) {
+  subjectLine = 'Your org has no email alerts.';
+}
+else {
+  subjectLine = 'Here\'s your list of email alerts';
+  Messaging.EmailFileAttachment csvAttc = new Messaging.EmailFileAttachment();
+  blob csvBlob = Blob.valueOf(alertCSV);
+  string csvname= 'Email alerts.csv'; csvAttc.setFileName(csvname);
+  csvAttc.setBody(csvBlob);
+  mail.setFileAttachments(new Messaging.EmailFileAttachment[]{csvAttc});
+}
 
-String emailMessage = '\n' +
-'\n' + 'There are ' + TotalWorkflowAlerts.format() + ' Workflow Alerts in this org.' +
+String emailBody = '\n' +
+'\n' + thisAppName + ' version ' + version +
 '\n' + 'Job status: ' + asyncApexJob.Status + 
-'\n' + 'There were ' + String.valueOf(dbErrors.format()) + ' dbErrors.' +
-'\n' + 'There were ' + String.valueOf(warnings.format()) + ' warnings.' +
-'\n' + 'Biggest batch size=' + string.valueOf(max_batchsize.format()) +
-'\n' + asyncApexJob.numberOfErrors + ' batches had errors.' +
-'\n' + asyncApexJob.jobItemsProcessed + ' batches processed.' +
-'\n' + 'Elapsed time ' + elapsedTime + ' hrs.' + 
+'\n' + 'There are ' + totalEmailAddresses.format() + ' email addresses used by alerts and Flow email actions.' +
+'\n' + 'Batch size=' + string.valueOf(max_batchsize.format()) +
+'\n' + 'Elapsed time ' + elapsedTime + 
 '\n\n' + 'Governor statistics: ' + summarizeBatchGovernorStats() +
 '\n\n' + 'Exceptions: ' + exceptions;
 
-Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
-mail.setSubject(thisAppName + ' ' + asyncApexJob.Status + '. ' + NumberOfErrors + ' errors');
+mail.setSubject(subjectLine);
 Mail.setCharset('UTF-8');
 mail.setReplyTo('noreply@salesforce.com');
-mail.setSenderDisplayName(thisAppName);
-mail.setPlainTextBody(emailMessage);
+mail.setSenderDisplayName('Salesforce');
+mail.setPlainTextBody(emailBody);
 mail.setToAddresses(UserInfo.getUserEmail().split(','));
+system.debug ('glixl emailJobResult: emailMessage=' + emailBody);
 Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
-system.debug ('glixl emailJobResult: emailMessage=' + emailMessage);
 } // end method
+
+//---------------------------------------------------------
+private string convertMsToHHMMSS (long ms) {
+//---------------------------------------------------------
+long elapsedSecs = ms/1000;
+string hrs = elapsedSecs / 3600 + 'h '; // test was 7510 secs elapsed time
+string mins = math.Mod(elapsedSecs, 3600) / 60 + 'm ';
+string secs = math.Mod( math.Mod(elapsedSecs, 3600), 60) + 's';
+return hrs + mins + secs;
+}
 
 //---------------------------------------------------------
 private void updateBatchGovernorStats(integer scopeSize) {
@@ -276,16 +373,15 @@ if (Limits.getEmailInvocations() > max_emails) max_emails = Limits.getEmailInvoc
 //---------------------------------------------------------
 private string summarizeBatchGovernorStats() {
 //---------------------------------------------------------
+//
 string summary = '';
-
 summary += '\n' + 'Batch with most cpu=' + String.valueOf(max_cpu.format()) + 'ms. Limit=' + String.valueOf(Limits.getLimitCpuTime().format()) + 'ms';
-summary += '\n' + 'Batch with biggest heapsize=' + String.valueOf(max_heap.format()) + '. Limit=' + String.valueOf(Limits.getLimitHeapSize().format());
-summary += '\n' + 'Batch with most DML statements=' + String.valueOf(max_dmlstmt.format()) + '. Limit=' + String.valueOf(Limits.getLimitDmlStatements().format());
-summary += '\n' + 'Batch with most DML rows=' + String.valueOf(max_dmlrows.format()) + '. Limit=' + String.valueOf(Limits.getLimitDmlRows().format());
+summary += '\n' + 'Batch with biggest heapsize=' + String.valueOf(max_heap.format()) + ' bytes. Limit=' + String.valueOf(Limits.getLimitHeapSize().format()) + ' bytes';
+//summary += '\n' + 'Batch with most DML statements=' + String.valueOf(max_dmlstmt.format()) + '. Limit=' + String.valueOf(Limits.getLimitDmlStatements().format());
+//summary += '\n' + 'Batch with most DML rows=' + String.valueOf(max_dmlrows.format()) + '. Limit=' + String.valueOf(Limits.getLimitDmlRows().format());
 summary += '\n' + 'Batch with most SOQL queries=' + String.valueOf(max_queries.format()) + '. Limit=' + String.valueOf(Limits.getLimitQueries().format());
 summary += '\n' + 'Batch with most SOQL rows=' + String.valueOf(max_queryrows.format()) + '. Limit=' + String.valueOf(Limits.getLimitQueryRows().format());
-summary += '\n' + 'Batch with most email invocations=' + String.valueOf(max_emails.format()) + '. Limit=' + String.valueOf(Limits.getLimitEmailInvocations().format());
-
+//summary += '\n' + 'Batch with most email invocations=' + String.valueOf(max_emails.format()) + '. Limit=' + String.valueOf(Limits.getLimitEmailInvocations().format());
 return summary;
 } // end method
 
@@ -320,8 +416,7 @@ public class Flow {
   public fl_attributes attributes;
   public string Id;
   public fl_Metadata Metadata;
-  public string CcEmails;
-  public string Description;  
+  public string MasterLabel;
 }
 
 public class fl_attributes {
@@ -329,23 +424,22 @@ public class fl_attributes {
 }
 
 public class fl_Metadata {
-  public list<fl_recipients> recipients;
+  public list<fl_actionCalls> actionCalls;
 }
 
-public class fl_recipients {
-  public string recipient;
-  public string type;
+public class fl_actionCalls {
+  public string actionType; // "emailSimple"
+  public list<fl_inputParameters> inputParameters;
+  public string label;
 }
 
-//---------------------------------------------------------
-// How to use wrapper class
-//---------------------------------------------------------
-private void shit() {
-String jsonInput = '{  "attributes" : {    "type" : "WorkflowAlert",    "url" : "servicesdatav56.0toolingsobjectsWorkflowAlert01W3c000000gDu2EAE"  },  "Id" : "01W3c000000gDu2EAE",  "TemplateId" : "00X80000001ExRoEAK",  "CcEmails" : "a@a.com,b@b.com",  "Description" : "aTest9",  "DeveloperName" : "aTest9",  "SenderType" : "CurrentUser",  "ManageableState" : "unmanaged",  "NamespacePrefix" : null,  "CreatedDate" : "2023-02-23T21:03:21.000+0000",  "CreatedById" : "00580000001hjv1AAA",  "LastModifiedDate" : "2023-03-09T16:56:17.000+0000",  "LastModifiedById" : "00580000001hjv1AAA",  "EntityDefinitionId" : "Account",  "Metadata" : {    "ccEmails" : [ "a@a.com,b@b.com" ],    "description" : "aTest9",    "protected" : false,    "recipients" : [ {      "field" : null,      "recipient" : "junkyard@yahoo.com",      "type" : "user"    }, {      "field" : null,      "recipient" : "mr.jcrm@gmail.com",      "type" : "user"    } ],    "senderAddress" : null,    "senderType" : "CurrentUser",    "template" : "unfiledp$?/ublicSalesNewCustomerEmail",    "urls" : null  },  "FullName" : "Account.aTest9"}';
-WorkflowAlert w = (WorkflowAlert)JSON.deserialize(jsonInput, WorkflowAlert.class);
-system.debug('---------------------------------------------------------------------------------');
-system.debug('id=' + w.id + ' ccemails=' + w.ccemails + ' desc=' + w.Description + ' type=' + w.attributes.type);
-system.debug('recip0=' + w.metadata.recipients[0].recipient + ' type=' + w.metadata.recipients[0].type);
-} // end method
+public class fl_inputParameters {
+  public string name; // "emailAddresses"
+  public fl_value value; // was "public fl_value value;"
+}
+
+public class fl_value {
+  public string stringValue; // "x@x.com,y@y.com"
+}
 
 } // end class
