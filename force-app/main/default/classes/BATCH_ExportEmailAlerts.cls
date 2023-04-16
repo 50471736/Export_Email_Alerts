@@ -80,7 +80,7 @@ public Iterable<String> start(Database.BatchableContext BC) {
 //---------------------------------------------------------
 list<string> alertIds = new list<string>();
 
-// Set up common HTTP parameters for JSON web callouts
+// Set up common HTTP parameters for JSON web callouts.
 HttpRequest req = new HttpRequest();
 Http h = new Http();
 HttpResponse res;
