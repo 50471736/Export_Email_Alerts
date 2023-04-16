@@ -80,7 +80,11 @@ public Iterable<String> start(Database.BatchableContext BC) {
 //---------------------------------------------------------
 list<string> alertIds = new list<string>();
 
+<<<<<<< HEAD
 // Set up common HTTP parameters for JSON web callouts.
+=======
+// Set up common HTTP parameters for JSON web callouts
+>>>>>>> 1d9e2b9e1848399b0215e15bf3008ae46d973b55
 HttpRequest req = new HttpRequest();
 Http h = new Http();
 HttpResponse res;
@@ -495,4 +499,8 @@ return [
 // END OF methods for getting role and subordinate users, for a specific role
 //---------------------------------------------------------------------------
 
+<<<<<<< HEAD
 } // end class
+=======
+} // end class
+>>>>>>> 1d9e2b9e1848399b0215e15bf3008ae46d973b55
