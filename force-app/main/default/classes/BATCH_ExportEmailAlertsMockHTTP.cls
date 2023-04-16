@@ -33,8 +33,4 @@ res.setStatusCode(200); res.setStatus('ok');
 return res;
 } // end method
 
-<<<<<<< HEAD
 } // end class
-=======
-} // end class
->>>>>>> 1d9e2b9e1848399b0215e15bf3008ae46d973b55
