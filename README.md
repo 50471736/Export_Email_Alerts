@@ -1,18 +1,16 @@
-# Salesforce DX Project: Next Steps! 
-
-Now that you’ve created a Salesforce DX project, what’s next? Here are some documentation resources to get you started.
-
-## How Do You Plan to Deploy Your Changes?
-
-Do you want to deploy a set of changes, or create a self-contained application? Choose a [development model](https://developer.salesforce.com/tools/vscode/en/user-guide/development-models).
-
-## Configure Your Salesforce DX Project
-
-The `sfdx-project.json` file contains useful configuration information for your project. See [Salesforce DX Project Configuration](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_ws_config.htm) in the _Salesforce DX Developer Guide_ for details about this file.
-
-## Read All About It
-
-- [Salesforce Extensions Documentation](https://developer.salesforce.com/tools/vscode/)
-- [Salesforce CLI Setup Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_intro.htm)
-- [Salesforce DX Developer Guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_intro.htm)
-- [Salesforce CLI Command Reference](https://developer.salesforce.com/docs/atlas.en-us.sfdx_cli_reference.meta/sfdx_cli_reference/cli_reference.htm)
+# Export Email Alerts
+## Purpose
+Exports all email alerts and Flow email actions to a CSV spreadsheet and emails it to current user
+## Strategies
+- Uses REST/Tooling API to read the WorkflowAlert and Flow sObjects
+- Uses batch Apex to handle large alert volumes
+## Author
+Sir Rodney MacKenzie mr.jcrm@gmail.com, February 2023
+## How to run
+- Admin privileges are recommended
+- Execute anonymous: <tt>Database.executeBatch(new BATCH_ExportEmailAlerts(),50);</tt>
+- Or, deploy the classes then create a flow with a screen element whose button runs Apex Action "Export Email Alerts"
+## Known issues
+- After clicking an alert URL in the CSV, the detail page is shown in SFDC Classic, not Lightning.
+- When viewed in LibreOffice Calc, the links in the CSV are sometimes truncated or non-responsive.Exports all email alerts and Flow email actions to a CSV spreadsheet and emails it to current user
+# Here's what the CSV looks like
