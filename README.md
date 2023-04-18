@@ -14,3 +14,4 @@ Sir Rodney MacKenzie mr.jcrm@gmail.com, February 2023
 - After clicking an alert URL in the CSV, the detail page is shown in SFDC Classic, not Lightning.
 - When viewed in LibreOffice Calc, the links in the CSV are sometimes truncated or non-responsive.Exports all email alerts and Flow email actions to a CSV spreadsheet and emails it to current user
 # Here's what the CSV looks like
+<img width="613" alt="image" src="https://user-images.githubusercontent.com/16543260/232662125-a596d2c1-5694-4b07-ac98-b1cc2c0d9753.png">
