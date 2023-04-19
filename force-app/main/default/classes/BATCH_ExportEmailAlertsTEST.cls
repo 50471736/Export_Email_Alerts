@@ -87,7 +87,7 @@ insert publicGroup;
 
 // Create user. Username must match user name in mock HTTP's JSON payload. Value: "<uniqueString>@1.com" (first user)
 // Select existing profile and assign to new users.
-Profile profile= [SELECT Id FROM profile WHERE Name='System Administrator' LIMIT 1]; 
+Profile profile= [SELECT Id FROM profile WHERE Name='Standard User' LIMIT 1]; 
 list<user> users = new list<user>();
 for (integer x=0; x < howMany; x++) { // Create as many users as requested
     users.add (new user (
