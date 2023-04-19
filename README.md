@@ -15,4 +15,4 @@ Admin privileges are recommended.
 - After clicking an alert URL in the CSV, the detail page is shown in SFDC Classic, not Lightning.
 - When viewed in LibreOffice Calc, the links in the CSV are sometimes truncated or non-responsive.Exports all email alerts and Flow email actions to a CSV spreadsheet and emails it to current user
 ## Sample CSV
-<img width="613" alt="image" src="https://user-images.githubusercontent.com/16543260/232662125-a596d2c1-5694-4b07-ac98-b1cc2c0d9753.png">
+<img width="756" alt="image" src="https://user-images.githubusercontent.com/16543260/233123459-26b59b2a-66a1-4492-8ccd-dbac840f2b1d.png">
