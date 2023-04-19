@@ -21,7 +21,7 @@
 //---------------------------------------------------------
 public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Database.Stateful, Database.AllowsCallouts  {
   //---------------------------------------------------------
-  static final string version = '1.1';
+  static final string version = '1.0-beta';
   
   //---------------------------------------------------------
   @InvocableMethod(label='Export Email Alerts') public static void exportEmailAlerts() {
