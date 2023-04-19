@@ -19,8 +19,8 @@ global HTTPResponse respond(HTTPRequest req) {
         
 // Fabricate an HTTP response.
 // NOTE: JSON user.recipient must be "g50471736@0.com" to match test data
-// NOTE: JSON group.recipient must be "g50471736" to match test data
-// NOTE: JSON role.recipient must be "g50471736" to match test data
+// NOTE: JSON group.recipient must be "g50471736" to match test data.
+// NOTE: JSON role.recipient must be "g50471736" to match test data.
 HttpResponse res = new HttpResponse();
 res.setHeader('Content-Type', 'application/json');
 if (alertType == 'WorkflowAlert') {
