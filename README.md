@@ -5,7 +5,7 @@
 ## Strategies
 - Uses REST/Tooling API to read the WorkflowAlert and Flow sObjects
 - Uses batch Apex to handle large alert volumes
-- For Recipients which are public groups, roles, or role-subordinates, the individual users are listed in the CSV
+- For alert recipients which are public groups, roles, or role-subordinates, the individual users are listed in the CSV
 ## Author
 Rod MacKenzie mr.jcrm@gmail.com, February 2023
 ## How to run
