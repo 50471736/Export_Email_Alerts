@@ -20,15 +20,16 @@
 
 //---------------------------------------------------------
 public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Database.Stateful, Database.AllowsCallouts  {
-  //---------------------------------------------------------
-  static final string version = '1.0-beta';
+//---------------------------------------------------------
+
+static final string version = '1.01-beta';
   
-  //---------------------------------------------------------
-  @InvocableMethod(label='Export Email Alerts') public static void exportEmailAlerts() {
-  //---------------------------------------------------------
-  // This method makes the class available as an Apex Action in flow builder
-  Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be on the safe side.
-  } // end method
+//---------------------------------------------------------
+@InvocableMethod(label='Export Email Alerts') public static void exportEmailAlerts() {
+//---------------------------------------------------------
+// This method makes the class available as an Apex Action in flow builder
+Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be on the safe side.
+} // end method
   
   // Governor statistics
   public integer max_cpu = 0;
@@ -41,8 +42,9 @@ public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Data
   public integer max_batchsize = 0;
       
   // Vars for any batch job
-  public string exceptions= ''; // List of exceptions encountered by this job.
-  public integer exceptionsCount = 0;
+  public string errorString= ''; // List of errors encountered by this job.
+  public integer appErrorCount = 0;
+  integer totalErrors = 0;
   public datetime startTime = system.now();
   static final string SFDC_URL = Url.getSalesforceBaseUrl().toExternalForm(); // E.g., Url.getOrgDomainUrl().toExternalForm() (Canonical URL) or Url.getSalesforceBaseUrl().toExternalForm() (Host-independent URL)
       
@@ -96,16 +98,16 @@ public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Data
   req.setEndpoint(SFDC_URL + '/services/data/'+ APIVER + '/tooling/query?q=' + query_start_flow);
   getAlertIds (h, req, res, alertIds);
    
-  return alertIds; // Return list of alert Ids.
-  } // end methos
+   return alertIds; // Return list of alert Ids.
+  } // end method
   
   //---------------------------------------------------------
   private void getAlertIds (Http h, HttpRequest req, HttpResponse res, list<string> alertIds) {
   //---------------------------------------------------------
   res = h.send(req);
   if (res.getStatus() != 'ok') { 
-    exceptions = exceptions + '\ngetAlertIds: HTTP GET error: ' + res.getStatus(); 
-    exceptionsCount++;
+    errorString = errorString + '\ngetAlertIds: HTTP GET error: ' + res.getStatus(); 
+    appErrorCount++;
   }
   else {
     JSONParser parser = JSON.createParser(res.getBody());
@@ -119,7 +121,7 @@ public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Data
   } // end method
   
   //---------------------------------------------------------
-  public void execute(Database.BatchableContext BC, List<String> scope) {
+  public void execute(Database.BatchableContext BC, list<String> scope) {
   //---------------------------------------------------------
   HttpRequest req = new HttpRequest();
   Http h = new Http();
@@ -302,7 +304,6 @@ public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Data
   //---------------------------------------------------------
   public void emailJobResult(Database.BatchableContext BC) {
   //---------------------------------------------------------
-  //string elapsedTime = ((system.now().getTime() - startTime.getTime()) / 1000.0 / 60.0 / 60.0).format();
   string elapsedTime = convertMsToHHMMSS (system.now().getTime() - startTime.getTime());
   
   Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
@@ -312,14 +313,15 @@ public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Data
     WHERE Id = :BC.getJobId()];
   
   string subjectLine;
-  if (asyncApexJob.numberOfErrors > 0) {
-    subjectLine = thisAppName + ' ' + asyncApexJob.Status + '. ' + asyncApexJob.numberOfErrors + ' batches had errors';
+  totalErrors = asyncApexJob.numberOfErrors + appErrorCount;
+  if (totalErrors > 0) {
+    subjectLine = thisAppName + ': There were ' + totalErrors + ' errors';
   }
   else if (totalEmailAddresses == 0) {
     subjectLine = 'Your org has no email alerts.';
   }
   else {
-    subjectLine = 'Here\'s your list of email alerts';
+    subjectLine = 'Here\'s your list of email alerts.';
     Messaging.EmailFileAttachment csvAttc = new Messaging.EmailFileAttachment();
     blob csvBlob = Blob.valueOf(alertCSV);
     string csvname= 'Email alerts.csv'; csvAttc.setFileName(csvname);
@@ -335,7 +337,7 @@ public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Data
   //'\n' + 'Batch size=' + string.valueOf(max_batchsize.format()) +
   '\n' + 'Elapsed time ' + elapsedTime + 
   '\n\n' + 'Governor statistics: ' + summarizeBatchGovernorStats() +
-  '\n\n' + 'There were ' + exceptionsCount + ' exceptions.' + exceptions;
+  '\n\n' + 'There were ' + totalErrors + ' errors.' + errorString;
   
   mail.setSubject(subjectLine);
   Mail.setCharset('UTF-8');
