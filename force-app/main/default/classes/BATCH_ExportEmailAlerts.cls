@@ -22,7 +22,7 @@
 public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Database.Stateful, Database.AllowsCallouts  {
 //---------------------------------------------------------
 
-static final string version = '1.02-beta';
+static final string version = '1.04-beta';
   
 //---------------------------------------------------------
 @InvocableMethod(label='Export Email Alerts') public static void exportEmailAlerts() {
@@ -106,7 +106,7 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
   //---------------------------------------------------------
   res = h.send(req);
   if (res.getStatus() != 'ok') { 
-    errorString = errorString + '\ngetAlertIds: HTTP GET error(' + recType + '): ' + res.getStatus(); 
+    errorString = errorString + '\ngetAlertIds: HTTP GET error(' + recType + '): status=' + res.getStatus(); 
     appErrorCount++;
   }
   else {
