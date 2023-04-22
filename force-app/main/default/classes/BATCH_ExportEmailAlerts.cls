@@ -177,7 +177,7 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
       alertCSV = alertCSV + 
         '"' + ccEmailList[x] + '",' +
         '"' + w.Description + '",' +
-        '"' + w.attributes.type + '",' + 
+        '"Email alert",' + // '"' + w.attributes.type + '",' + 
         '" ",' + 
         '" ",' +
         '"' + 'Cc email' + '",' + 
@@ -261,7 +261,7 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
     alertCSV = alertCSV + 
       '"' + userList[y].email + '",' +
       '"' + w.Description + '",' +
-      '"' + w.attributes.type + '",' + 
+      '"Email alert",' + //'"' + w.attributes.type + '",' + 
       '"' + userList[y].firstName + ' ' + userList[y]. lastName + '",' +
       '"' + w.Metadata.recipients[whichRecip].type + '",' +
       '"' + w.Metadata.recipients[whichRecip].recipient + '",' +
@@ -286,7 +286,7 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
             alertCSV = alertCSV + 
             '"' + emailList[x] + '",' +
             '"' + f.MasterLabel + '/' + f.Metadata.actionCalls[a].label + '",' +
-            '"' + f.attributes.type + '",' + 
+            '"Flow email action",' + //'"' + f.attributes.type + '",' + 
             '" ",' +
             '" ",' +
             '" ",' +
