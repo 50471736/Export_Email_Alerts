@@ -22,4 +22,4 @@ Then,
 - After clicking an alert URL in the CSV, the detail page is shown in SFDC Classic, not Lightning.
 - When viewed in LibreOffice Calc, the links in the CSV are sometimes truncated or non-responsive.
 ## Sample CSV
-<img width="756" alt="image" src="https://user-images.githubusercontent.com/16543260/233123459-26b59b2a-66a1-4492-8ccd-dbac840f2b1d.png">
+<img width="769" alt="Email alerts" src="https://user-images.githubusercontent.com/16543260/233796850-b12af254-c27e-4de3-ba76-dd4aa726b339.png">
