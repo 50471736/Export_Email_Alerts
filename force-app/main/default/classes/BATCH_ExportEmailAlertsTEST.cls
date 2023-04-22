@@ -26,6 +26,15 @@ Test.stopTest();
 } // end method
 
 //--------------------------------------------------------------------------------
+static testmethod void test_CodeCvg_ApexAction() {
+//--------------------------------------------------------------------------------
+Test.startTest();
+Test.setMock(HttpCalloutMock.class, new BATCH_ExportEmailAlertsMockHTTP('NoAlerts'));
+BATCH_ExportEmailAlerts.ExportEmailAlerts();
+Test.stopTest();
+} // end method
+
+//--------------------------------------------------------------------------------
 static testmethod void test_Functionality_EmailAction() {
 //--------------------------------------------------------------------------------
 Test.startTest();
@@ -66,6 +75,26 @@ else {
 } // end method
 
 //--------------------------------------------------------------------------------
+static testmethod void test_Functionality_HTTPErr() {
+//--------------------------------------------------------------------------------
+Test.startTest();
+Test.setMock(HttpCalloutMock.class, new BATCH_ExportEmailAlertsMockHTTP('HTTPErr'));
+BATCH_ExportEmailAlerts b = new BATCH_ExportEmailAlerts();
+Database.executeBatch(b,10);
+Test.stopTest();
+} // end method
+
+//--------------------------------------------------------------------------------
+static testmethod void test_Functionality_NoAlerts() {
+//--------------------------------------------------------------------------------
+Test.startTest();
+Test.setMock(HttpCalloutMock.class, new BATCH_ExportEmailAlertsMockHTTP('NoAlerts'));
+BATCH_ExportEmailAlerts b = new BATCH_ExportEmailAlerts();
+Database.executeBatch(b,10);
+Test.stopTest();
+} // end method
+
+//--------------------------------------------------------------------------------
 @testsetup static void setup() {
 //--------------------------------------------------------------------------------
 setup_users(1);
@@ -80,6 +109,9 @@ final string uniqueString = 'g50471736';
 // Create role. Must match role (or role/sub) name in mock HTTP's JSON payload. Value: "<uniqueString>"
 UserRole role = new UserRole(DeveloperName = uniqueString, Name = uniqueString);
 insert role;
+// Create subrole.
+UserRole subRole = new UserRole(DeveloperName = uniqueString + 'subrole', Name = uniqueString + 'subrole', ParentRoleId = role.id);
+insert subRole;
 
 // Create public group. Must match group name in mock HTTP's JSON payload. Value: "<uniqueString>"
 group publicGroup = new group (Name = uniqueString, DeveloperName = uniqueString);

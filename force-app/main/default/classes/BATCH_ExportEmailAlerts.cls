@@ -92,21 +92,21 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
   
   // Get WorkflowAlert ids
   req.setEndpoint(SFDC_URL + '/services/data/'+ APIVER + '/tooling/query?q=' + query_start_workflowalert);
-  getAlertIds (h, req, res, alertIds);
+  getAlertIds (h, req, res, alertIds, 'WorkflowAlert');
   
   // Get Flow ids
   req.setEndpoint(SFDC_URL + '/services/data/'+ APIVER + '/tooling/query?q=' + query_start_flow);
-  getAlertIds (h, req, res, alertIds);
+  getAlertIds (h, req, res, alertIds,'Flow');
    
    return alertIds; // Return list of alert Ids.
   } // end method
   
   //---------------------------------------------------------
-  private void getAlertIds (Http h, HttpRequest req, HttpResponse res, list<string> alertIds) {
+  private void getAlertIds (Http h, HttpRequest req, HttpResponse res, list<string> alertIds, string recType) {
   //---------------------------------------------------------
   res = h.send(req);
   if (res.getStatus() != 'ok') { 
-    errorString = errorString + '\ngetAlertIds: HTTP GET error: ' + res.getStatus(); 
+    errorString = errorString + '\ngetAlertIds: HTTP GET error(' + recType + '): ' + res.getStatus(); 
     appErrorCount++;
   }
   else {
@@ -330,8 +330,8 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
   }
   
   String emailBody = 
-  '\n' + thisAppName + ' version ' + version +
   '\n' + subjectLine +
+  '\n' + thisAppName + ' version ' + version +
   '\n' + 'Job status: ' + asyncApexJob.Status + 
   '\n' + 'There are ' + totalEmailAddresses.format() + ' email addresses used by alerts and Flow email actions.' +
   //'\n' + 'Batch size=' + string.valueOf(max_batchsize.format()) +
