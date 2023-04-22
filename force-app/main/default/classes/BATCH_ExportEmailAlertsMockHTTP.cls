@@ -39,7 +39,9 @@ else if (alertType == 'NoAlerts') {
   //res.setBody ('{"attributes":{"type":"Flow","url":"/services/data/v56.0/tooling/sobjects/Flow/xxx3c000000gQhfAAE"},"Id":"xxx3c000000gQhfAAE"}');
   res.setBody ('{"size":0,"totalSize":0,"done":true,"queryLocator":null,"entityTypeName":null,"records":[]}');
   res.setStatusCode(200); res.setStatus('ok');
-}return res;
+}
+
+return res;
 } // end method
 
 } // end class

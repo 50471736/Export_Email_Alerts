@@ -44,7 +44,7 @@ Database.executeBatch(b,10);
 Test.stopTest();
 
 // Test: Make sure CSV has the right number of Flow email actions based on the HTTPMock data.
-integer flowsFound = BATCH_ExportEmailAlerts.copyOfAlertCSV.countMatches('"Flow"');
+integer flowsFound = BATCH_ExportEmailAlerts.copyOfAlertCSV.countMatches('"Flow email action"'); // was "Flow"
 if (2 == flowsFound) {
     system.debug('Test passed. CSV has two Flow alerts.');
 }
@@ -58,13 +58,13 @@ else {
 static testmethod void test_Functionality_WorkflowAlert() {
 //--------------------------------------------------------------------------------
 Test.startTest();
-Test.setMock(HttpCalloutMock.class, new BATCH_ExportEmailAlertsMockHTTP('WorkflowAlert'));
+Test.setMock(HttpCalloutMock.class, new BATCH_ExportEmailAlertsMockHTTP('WorkflowAlert')); 
 BATCH_ExportEmailAlerts b = new BATCH_ExportEmailAlerts();
 Database.executeBatch(b,10);
 Test.stopTest();
 
 // Test: Make sure CSV has the right number of WorkflowAlerts based on the HTTPMock data.
-integer wfaFound = BATCH_ExportEmailAlerts.copyOfAlertCSV.countMatches('"WorkflowAlert"');
+integer wfaFound = BATCH_ExportEmailAlerts.copyOfAlertCSV.countMatches('"Email alert"'); // was "WorkflowAlert"
 if (14 == wfaFound) {
     system.debug('Test passed. CSV has 14 WorkflowAlerts.');
 }
