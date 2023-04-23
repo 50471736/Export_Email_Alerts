@@ -8,14 +8,11 @@
 - Uses batch Apex to handle large alert volumes
 ## Author
 Rod MacKenzie mr.jcrm@gmail.com, February 2023
-## How to run
-Admin privileges are recommended.
-<br>Deploy the classes:
+## Installation. Deploy the classes
 - BATCH_ExportEmailAlerts
 - BATCH_ExportEmailAlertsMockHTTP
 - BATCH_ExportEmailAlertsTEST
-
-Then,
+## How to run (admin privileges are recommended)
 - Execute anonymous: <tt>Database.executeBatch(new BATCH_ExportEmailAlerts(),50);</tt>
 - Or, you can create a flow with a screen element whose button runs Apex Action "Export Email Alerts"
 ## Known issues
