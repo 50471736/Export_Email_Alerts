@@ -3,9 +3,9 @@
 ## Purpose
 *This is a beta release. Use the GitHub [Issues tab](https://github.com/50471736/Export_Email_Alerts/issues) to report bugs or request enhancements.*
 <br><br>Several people have wished for a way to list all Salesforce email alerts, including email addresses. This solution exports all email alerts and Flow email actions to a CSV spreadsheet and emails it to the current user.
-## Strategies
-- Uses REST/Tooling API to read the WorkflowAlert and Flow sObjects
-- Uses batch Apex to handle large alert volumes
+## Architecture
+- REST/Tooling API to read the WorkflowAlert and Flow sObjects
+- Batch Apex to handle large alert volumes
 ## Author
 Rod MacKenzie mr.jcrm@gmail.com, February 2023
 ## Installation. Deploy the classes
