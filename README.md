@@ -13,7 +13,7 @@ Rod MacKenzie mr.jcrm@gmail.com, February 2023
 - BATCH_ExportEmailAlertsMockHTTP
 - BATCH_ExportEmailAlertsTEST
 ## How to run (admin privileges are recommended)
-- Execute anonymous: <tt>Database.executeBatch(new BATCH_ExportEmailAlerts(),50);</tt>
+- Execute anonymous: ```Database.executeBatch(new BATCH_ExportEmailAlerts(),50);```
 - Or, you can create a flow with a screen element whose button runs Apex Action "Export Email Alerts"
 ## Known issues
 - After clicking an alert URL in the CSV, the detail page is shown in SFDC Classic, not Lightning.
