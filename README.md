@@ -1,4 +1,4 @@
-# Export Email Alerts ![SFDCLogo transparent 03pct](https://user-images.githubusercontent.com/16543260/233866155-fcd090d8-82cd-49fa-90d7-d2c2f2ee4b00.png)
+# Export Email Alerts  ![SFDCLogo transparent 03pct](https://user-images.githubusercontent.com/16543260/233866155-fcd090d8-82cd-49fa-90d7-d2c2f2ee4b00.png)
 ## Purpose
 *This is a beta release. Use the GitHub [Issues tab](https://github.com/50471736/Export_Email_Alerts/issues) to report bugs or request enhancements.*
 <br><br>Several people have expressed a need to list all Salesforce email alerts, including email addresses. This solution exports all email alerts and Flow email actions to a CSV spreadsheet and emails it to the current user.
