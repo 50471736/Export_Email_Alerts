@@ -17,6 +17,5 @@ Deploy these classes:
 - Or, you can create a flow with a screen element whose button runs Apex Action "Export Email Alerts"
 ## Known issues
 - After clicking an alert URL in the CSV, the detail page is shown in SFDC Classic, not Lightning.
-- When viewed in LibreOffice Calc, the links in the CSV are sometimes truncated or non-responsive.
 ## Sample CSV
 <img width="769" alt="Email alerts" src="https://user-images.githubusercontent.com/16543260/233796850-b12af254-c27e-4de3-ba76-dd4aa726b339.png">
