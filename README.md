@@ -6,7 +6,7 @@ Several administrators have expressed a need to list all Salesforce email alerts
 - REST/Tooling API to read the WorkflowAlert and Flow sObjects
 - Batch Apex to handle large numbers of alerts
 ## Author
-Rod MacKenzie mr.jcrm@gmail.com, February 2023
+Rod MacKenzie mr.jcrm@gmail.com
 ## Installation
 Deploy these classes:
 - BATCH_ExportEmailAlerts
