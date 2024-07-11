@@ -7,19 +7,19 @@
 // Strategy: Uses REST/Tooling API to read the WorkflowAlert and Flow sObjects
 // Strategy: Uses batch Apex to handle large alert volumes (>100)
 // Updates made to Salesforce data: None
-// Author: Sir Rodney MacKenzie mr.jcrm@gmail.com, February 2023
+// Author: Sir Rodney MacKenzie mr.jcrm@gmail.com, 2023
 //
 // How to run (admin privileges are recommended)
-//  - Execute anonymous: Database.executeBatch(new BATCH_ExportEmailAlerts(),50); // Last parameter is batch size (min=1, max=100)
-//  - Or, deploy these classes, then create a flow with a screen element whose button runs Apex Action "Export Email Alerts"
+//    Deploy the classes. Then,
+//    - Execute anonymous: Database.executeBatch(new BATCH_ExportEmailAlerts(),50); // Last parameter is batch size (min=1, max=100)
+//    - Or, create a flow with a screen element whose button runs Apex Action "Export Email Alerts"
 //
 // Known issues
 //   - After clicking an alert URL in the CSV, the detail page is shown in SFDC Classic, not Lightning.
-//   - When viewed in LibreOffice Calc, the links in the CSV are sometimes truncated or non-responsive.
 //---------------------------------------------------------
 
 //---------------------------------------------------------
-public class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Database.Stateful, Database.AllowsCallouts  {
+public with sharing class BATCH_ExportEmailAlerts implements Database.Batchable<String>, Database.Stateful, Database.AllowsCallouts  {
 //---------------------------------------------------------
 
 static final string version = '1.0.0';
@@ -46,12 +46,12 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
   public integer appErrorCount = 0;
   integer totalErrors = 0;
   public datetime startTime = system.now();
-  static final string SFDC_URL = Url.getSalesforceBaseUrl().toExternalForm(); // E.g., Url.getOrgDomainUrl().toExternalForm() (Canonical URL) or Url.getSalesforceBaseUrl().toExternalForm() (Host-independent URL)
-      
+  static final string SFDC_URL = Url.getSalesforceBaseUrl().toExternalForm(); 
+        
   // Vars for this app
   public string alertCSV = '';
   static final string thisAppName = 'ExportEmailAlerts'; 
-  static final string APIVER = 'v56.0';
+  static final string APIVER = 'v57.0';
   static final string query_start_workflowalert = 'Select+id+from+workflowalert';
   static final string query_start_flow = 'Select+id+from+flow+where+status=\'active\'+and+processtype=\'flow\'';
   public integer totalEmailAddresses = 0;
@@ -75,6 +75,7 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
   public BATCH_ExportEmailAlerts() { // Constructor
   //---------------------------------------------------------
   alertCSV = CSVHeading; // Initialize CSV
+  //APIVER = APIVersionOfCurrentClass();
   } // end method
   
   //---------------------------------------------------------
@@ -86,7 +87,7 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
   HttpRequest req = new HttpRequest();
   Http h = new Http();
   HttpResponse res;
-  req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionID());
+  //req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionID());
   req.setHeader('Content-Type', 'application/json');
   req.setMethod('GET'); 
   
@@ -496,5 +497,5 @@ Database.executeBatch(new BATCH_ExportEmailAlerts(),1); // Use batchsize=1 to be
   //---------------------------------------------------------------------------
   // END OF methods for getting role and subordinate users, for a specific role
   //---------------------------------------------------------------------------
-  
-  } // end class
+
+} // end class
